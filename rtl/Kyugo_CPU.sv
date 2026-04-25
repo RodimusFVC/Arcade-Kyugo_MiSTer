@@ -361,10 +361,89 @@ wire [7:0] prom_tim_D;
 eprom_32b prom_tim_rom (.CLK(clk_49m), .ADDR(5'd0), .CLK_DL(clk_49m),
 	.ADDR_DL(ioctl_addr), .DATA_IN(ioctl_data), .CS_DL(prom_tim_cs_i), .WR(ioctl_wr), .DATA(prom_tim_D));
 
-//----------------------------------------------- Video output stub (Phases 5-7 implement rendering) -----------------//
+//----------------------------------------------- BG render pipeline -------------------------------------------------//
 
-assign red   = 5'd0;
-assign green = 5'd0;
-assign blue  = 5'd0;
+// Screen coords (with flip)
+wire [8:0] bg_sx = flip_screen ? (9'd287 - base_h_cnt) : base_h_cnt;
+wire [8:0] bg_sy = flip_screen ? (9'd239 - v_cnt)      : v_cnt;
+
+// World coords (BG has set_scrolldx(-32) → +32 in world space when not flipped)
+wire [8:0] scroll_x_full = {scroll_x_hi, scroll_x_lo};
+wire [9:0] bg_world_x_pre = {1'b0, bg_sx} + {1'b0, scroll_x_full} + 10'd32;
+wire [8:0] bg_world_x = bg_world_x_pre[8:0];   // wraps mod 512 (matches 64x8 = 512 BG width)
+wire [8:0] bg_world_y = bg_sy + {1'b0, scroll_y_r};
+
+wire [5:0] bg_col = bg_world_x[8:3];   // 0..63
+wire [4:0] bg_row = bg_world_y[7:3];   // 0..31
+wire [2:0] bg_fx  = bg_world_x[2:0];   // 0..7
+wire [2:0] bg_fy  = bg_world_y[2:0];
+
+// "next" = data being fetched for the upcoming 8-pixel tile
+// "lat" = data for the currently-displaying 8-pixel tile
+reg  [9:0] bg_code_nxt;
+reg  [4:0] bg_color_nxt;
+reg        bg_fx_invert_nxt;       // 1 = display bit 0 is leftmost (per-tile flipx XOR screen flip)
+reg  [2:0] bg_fy_eff;              // fine_y after applying flipy + screen flip
+reg  [7:0] bg_p0_nxt, bg_p1_nxt, bg_p2_nxt;
+
+reg  [4:0] bg_color_lat;
+reg        bg_fx_invert_lat;
+reg  [7:0] bg_p0_lat, bg_p1_lat, bg_p2_lat;
+
+// Pipeline timing on cen_pix ticks within the 8-pixel tile:
+//   fx=0: drive bgvram_raddr / bgattr_raddr for NEXT tile (col + 1)
+//   fx=1: bgvram_rD / bgattr_rD valid → latch code, color, flip bits, fy_eff; drive plane ROM addrs
+//   fx=2: bg0_D / bg1_D / bg2_D valid → latch into _nxt
+//   fx=7: promote _nxt → _lat (becomes the displayed tile starting next fx=0)
+always_ff @(posedge clk_49m) begin
+    if (cen_pix) begin
+        case (bg_fx)
+            3'd0: begin
+                bgvram_raddr <= {bg_row, bg_col + 6'd1};
+                bgattr_raddr <= {bg_row, bg_col + 6'd1};
+            end
+            3'd1: begin
+                bg_code_nxt      <= {bgattr_rD[1:0], bgvram_rD};
+                bg_color_nxt     <= {bgpalbank, bgattr_rD[7:4]};
+                bg_fx_invert_nxt <= bgattr_rD[3] ^ flip_screen;            // per-tile flipx XOR screen flip
+                bg_fy_eff        <= bg_fy ^ {3{bgattr_rD[2] ^ flip_screen}}; // flipy XOR screen flip
+                bg0_addr <= {{bgattr_rD[1:0], bgvram_rD}, (bg_fy ^ {3{bgattr_rD[2] ^ flip_screen}})};
+                bg1_addr <= {{bgattr_rD[1:0], bgvram_rD}, (bg_fy ^ {3{bgattr_rD[2] ^ flip_screen}})};
+                bg2_addr <= {{bgattr_rD[1:0], bgvram_rD}, (bg_fy ^ {3{bgattr_rD[2] ^ flip_screen}})};
+            end
+            3'd2: begin
+                bg_p0_nxt <= bg0_D;
+                bg_p1_nxt <= bg1_D;
+                bg_p2_nxt <= bg2_D;
+            end
+            3'd7: begin
+                bg_color_lat     <= bg_color_nxt;
+                bg_fx_invert_lat <= bg_fx_invert_nxt;
+                bg_p0_lat        <= bg_p0_nxt;
+                bg_p1_lat        <= bg_p1_nxt;
+                bg_p2_lat        <= bg_p2_nxt;
+            end
+            default: ; // idle
+        endcase
+    end
+end
+
+// Display: select bit from latched plane bytes
+// Default (no per-tile flipx, no screen flip): bit 7 = leftmost pixel → use ~bg_fx
+// With flip: bit 0 = leftmost pixel → use bg_fx
+wire [2:0] bg_pix_bit_idx = bg_fx_invert_lat ? bg_fx : ~bg_fx;
+wire bg_p0_bit = bg_p0_lat[bg_pix_bit_idx];
+wire bg_p1_bit = bg_p1_lat[bg_pix_bit_idx];
+wire bg_p2_bit = bg_p2_lat[bg_pix_bit_idx];
+wire [2:0] bg_pix = {bg_p2_bit, bg_p1_bit, bg_p0_bit};
+
+wire [7:0] bg_palette_index = {bg_color_lat[4:0], bg_pix[2:0]};
+
+//----------------------------------------------- Placeholder RGB output (Phase 6 replaces with PROM lookup) ---------//
+
+wire visible = ~hblk & ~vblk;
+assign red   = visible ? bg_palette_index[7:3] : 5'd0;
+assign green = visible ? {bg_palette_index[4:2], 2'd0} : 5'd0;
+assign blue  = visible ? {bg_palette_index[2:0], 2'd0} : 5'd0;
 
 endmodule
