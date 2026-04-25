@@ -12,7 +12,7 @@
 
 ## Overview
 
-FPGA implementation of **Kyudo Hardware (1984)**, originally developed and released by Orca .
+FPGA implementation of **Kyugo Hardware (1984)**, originally developed and released by Orca .
 
 This core targets MiSTer FPGA and aims for accurate gameplay behavior, video timing, and sound reproduction.
 
