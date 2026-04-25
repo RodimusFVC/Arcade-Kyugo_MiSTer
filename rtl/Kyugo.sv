@@ -77,6 +77,13 @@ wire prom_lut_cs_i, prom_tim_cs_i;
 // Gate ROM loading to index 0
 wire ioctl_wr_cpu = ioctl_wr && (ioctl_index == 8'd0);
 
+// Variant selector: byte 0 of ioctl_index == 1 → 3-bit variant code (0=Gyrodine default)
+reg [2:0] variant_sel = 3'd0;
+always_ff @(posedge clk_49m) begin
+    if (ioctl_wr && (ioctl_index == 8'd1) && (ioctl_addr == 25'd0))
+        variant_sel <= ioctl_data[2:0];
+end
+
 // ROM address selector
 selector DLSEL
 (
@@ -143,6 +150,9 @@ Kyugo_CPU main_pcb
 	.ioctl_addr(ioctl_addr),
 	.ioctl_data(ioctl_data),
 	.ioctl_wr(ioctl_wr_cpu),
+
+	.variant_sel(variant_sel),
+	.coin_counter(),
 
 	.pause(pause),
 
