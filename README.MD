@@ -2,7 +2,7 @@
   <img src="Useful Information/Vastar.png" width="800">
 </p>
 
-<h1 align="center">Vastar FPGA Core</h1>
+<h1 align="center">Kyugo Hardware FPGA Core</h1>
 
 <p align="center">
   Arcade hardware implementation for MiSTer FPGA
@@ -12,7 +12,7 @@
 
 ## Overview
 
-FPGA implementation of **Vastar (1983)**, originally developed and released by Orca (Sesame Japan license).
+FPGA implementation of **Kyudo Hardware (1984)**, originally developed and released by Orca .
 
 This core targets MiSTer FPGA and aims for accurate gameplay behavior, video timing, and sound reproduction.
 
@@ -22,9 +22,9 @@ This core targets MiSTer FPGA and aims for accurate gameplay behavior, video tim
 
 | Field        | Value |
 |--------------|--------|
-| Title        | Vastar |
-| Year         | 1983 |
-| Developer    | Orca (Sesame Japan license) |
+| Title        | Gyrodine |
+| Year         | 1984 |
+| Developer    | Crux |
 | Genre        | Shooting |
 | Players      | 1–2 alternating |
 
