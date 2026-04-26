@@ -44,9 +44,9 @@ module Kyugo_CPU
 
 //------------------------------------------------------- Clock enables -------------------------------------------------------//
 
-// Pixel clock: 49.152 MHz * 3/32 = 4.608 MHz (Phase 5 will correct to 6.144 MHz = XTAL/3)
+// Pixel clock: 49.152 MHz * 4/32 = 6.144 MHz = XTAL/3 (matches MAME set_raw(XTAL/3, 396, 0, 288, 260, 16, 240) → 59.6575 Hz)
 wire [1:0] pix_cen_o;
-jtframe_frac_cen #(2) pix_cen (.clk(clk_49m), .n(10'd3), .m(10'd32), .cen(pix_cen_o), .cenb());
+jtframe_frac_cen #(2) pix_cen (.clk(clk_49m), .n(10'd4), .m(10'd32), .cen(pix_cen_o), .cenb());
 wire cen_pix = pix_cen_o[0];
 assign ce_pix = cen_pix;
 
